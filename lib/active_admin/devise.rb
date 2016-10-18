@@ -2,6 +2,52 @@ ActiveAdmin::Dependency.devise! ActiveAdmin::Dependency::Requirements::DEVISE
 
 require 'devise'
 
+module Devise
+  module Models
+    module Authenticatable
+      module ClassMethods
+        # Find or initialize a record with group of attributes based on a list of required attributes.
+        def find_or_initialize_without_errors(required_attributes, attributes) #:nodoc:
+          attributes = if attributes.respond_to? :permit!
+            attributes.slice(*required_attributes).permit!.to_h.with_indifferent_access
+          else
+            attributes.with_indifferent_access.slice(*required_attributes)
+          end
+          attributes.delete_if { |key, value| value.blank? }
+
+          if attributes.size == required_attributes.size
+            record = find_first_by_auth_conditions(attributes)
+          end
+
+          unless record
+            record = new
+
+            required_attributes.each do |key|
+              value = attributes[key]
+              record.send("#{key}=", value)
+            end
+          end
+
+          record
+        end
+      end
+    end
+
+    module Recoverable
+      module ClassMethods
+        # Attempt to find a user by its email. If a record is found, send new
+        # password instructions to it. If user is not found, won't return a message
+        # Attributes must contain the user's email
+        def send_reset_password_instructions(attributes={})
+          recoverable = find_or_initialize_without_errors(reset_password_keys, attributes)
+          recoverable.send_reset_password_instructions if recoverable.persisted?
+          recoverable
+        end
+      end
+    end
+  end
+end
+
 module ActiveAdmin
   module Devise
 
